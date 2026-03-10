@@ -28,6 +28,7 @@ add_library(mde_lib
     src/engine/processing_thread.cpp
     src/engine/order_book.cpp
     src/engine/aggregator.cpp
+    src/engine/signal_detector.cpp
 )
 
 target_include_directories(mde_lib PUBLIC ${CMAKE_SOURCE_DIR}/src)

@@ -1,6 +1,7 @@
 #include "config/config_loader.h"
 #include "feed/feed_handler.h"
 #include "engine/processing_thread.h"
+#include "engine/signal_detector.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -83,19 +84,28 @@ int main(int argc, char* argv[]) {
     mde::feed::FeedHandler feed_handler(config.feed, *queue);
     feed_handler.start(g_running);
 
-    mde::engine::ProcessingThread processor(*queue);
+    // Signal detection conditions
+    std::vector<mde::engine::SignalCondition> signals = {
+        {mde::engine::SignalType::SPREAD_WIDE, 50.0},       // Spread > $50
+        {mde::engine::SignalType::IMBALANCE_BID, 0.7},      // Bid imbalance > 70%
+        {mde::engine::SignalType::IMBALANCE_ASK, 0.7},      // Ask imbalance > 70%
+        {mde::engine::SignalType::PRICE_DEVIATION, 0.001},  // Mid deviates > 0.1% from SMA
+    };
+
+    mde::engine::ProcessingThread processor(*queue, std::move(signals));
     processor.start(g_running);
 
-    spdlog::info("Pipeline started: feed → queue → processor");
+    spdlog::info("Pipeline started: feed → queue → orderbook → aggregator → signals");
 
     // Main thread: periodic status reporting
     while (g_running.load(std::memory_order_relaxed)) {
         std::this_thread::sleep_for(std::chrono::seconds(5));
         if (g_running.load(std::memory_order_relaxed)) {
-            spdlog::info("Status | recv={} processed={} parse_err={} queue_full={} queue_depth={} | "
-                         "latency(last): parse={}us queue={}us total={}us",
+            spdlog::info("Status | recv={} processed={} signals={} parse_err={} queue_full={} "
+                         "queue_depth={} | latency(last): parse={}us queue={}us total={}us",
                 feed_handler.message_count(),
                 processor.processed_count(),
+                processor.signals_fired(),
                 feed_handler.parse_error_count(),
                 feed_handler.queue_full_count(),
                 queue->size_approx(),

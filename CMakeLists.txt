@@ -92,5 +92,16 @@ endif()
 option(MDE_BUILD_BENCH "Build benchmarks" OFF)
 if(MDE_BUILD_BENCH)
     find_package(benchmark REQUIRED)
-    # Benchmarks will be added as they are created
+
+    add_executable(bench_json_parse bench/bench_json_parse.cpp)
+    target_link_libraries(bench_json_parse PRIVATE mde_lib benchmark::benchmark)
+
+    add_executable(bench_queue bench/bench_queue.cpp)
+    target_link_libraries(bench_queue PRIVATE mde_lib benchmark::benchmark)
+
+    add_executable(bench_orderbook bench/bench_orderbook.cpp)
+    target_link_libraries(bench_orderbook PRIVATE mde_lib benchmark::benchmark)
+
+    add_executable(bench_e2e bench/bench_e2e.cpp)
+    target_link_libraries(bench_e2e PRIVATE mde_lib benchmark::benchmark)
 endif()

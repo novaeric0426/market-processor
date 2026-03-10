@@ -3,19 +3,24 @@
 #include "engine/processing_thread.h"
 #include "engine/signal_detector.h"
 #include "output/disk_logger.h"
+#include "output/metrics_server.h"
+#include "output/ws_server.h"
 #include "replay/replay_engine.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
+#include <nlohmann/json.hpp>
 
 #include <csignal>
 #include <atomic>
 #include <iostream>
 #include <cstring>
+#include <chrono>
 
 namespace {
     std::atomic<bool> g_running{true};
+    auto g_start_time = std::chrono::steady_clock::now();
 
     void signal_handler(int signum) {
         spdlog::info("Received signal {}, shutting down...", signum);
@@ -24,7 +29,7 @@ namespace {
 
     struct CliArgs {
         std::string config_path = "config/dev.yaml";
-        std::string replay_path;          // Empty = live mode
+        std::string replay_path;
         mde::replay::PlaybackSpeed speed = mde::replay::PlaybackSpeed::REALTIME;
     };
 
@@ -50,6 +55,95 @@ namespace {
             }
         }
         return args;
+    }
+
+    // Build JSON snapshot for /stats and WebSocket push.
+    std::string build_stats_json(
+        const mde::engine::ProcessingThread& processor,
+        const mde::feed::FeedHandler* feed,
+        const mde::replay::ReplayEngine* replay,
+        const mde::feed::FeedQueue& queue,
+        const mde::output::DiskLogger* recorder)
+    {
+        auto snapshot = processor.take_snapshot();
+        auto uptime_s = std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::steady_clock::now() - g_start_time).count();
+
+        nlohmann::json j;
+        j["uptime_s"] = uptime_s;
+        j["mode"] = replay ? "replay" : "live";
+        j["processed"] = snapshot.processed_count;
+        j["signals_fired"] = snapshot.signals_fired;
+        j["queue_depth"] = queue.size_approx();
+
+        // Latency
+        j["latency"]["parse_us"] = snapshot.last_parse_us;
+        j["latency"]["queue_us"] = snapshot.last_queue_us;
+        j["latency"]["total_us"] = snapshot.last_total_us;
+
+        // Feed metrics
+        if (feed) {
+            j["feed"]["received"] = feed->message_count();
+            j["feed"]["parse_errors"] = feed->parse_error_count();
+            j["feed"]["queue_full"] = feed->queue_full_count();
+        }
+
+        // Replay metrics
+        if (replay) {
+            j["replay"]["replayed"] = replay->replayed_count();
+            j["replay"]["total"] = replay->total_records();
+            j["replay"]["finished"] = replay->is_finished();
+            j["replay"]["paused"] = replay->is_paused();
+            auto spd = replay->speed();
+            const char* speed_str = "1x";
+            if (spd == mde::replay::PlaybackSpeed::FAST_2X) speed_str = "2x";
+            else if (spd == mde::replay::PlaybackSpeed::FAST_5X) speed_str = "5x";
+            else if (spd == mde::replay::PlaybackSpeed::MAX) speed_str = "max";
+            j["replay"]["speed"] = speed_str;
+        }
+
+        // Recording
+        if (recorder) {
+            j["recording"]["records"] = recorder->record_count();
+        }
+
+        // Per-symbol order book + aggregation
+        j["symbols"] = nlohmann::json::array();
+        for (const auto& sym : snapshot.symbols) {
+            nlohmann::json sj;
+            sj["symbol"] = sym.symbol;
+            sj["best_bid"] = sym.best_bid;
+            sj["best_ask"] = sym.best_ask;
+            sj["spread"] = sym.spread;
+            sj["mid_price"] = sym.mid_price;
+            sj["update_count"] = sym.update_count;
+            sj["aggregation"]["bid_vwap"] = sym.aggregation.bid_vwap;
+            sj["aggregation"]["ask_vwap"] = sym.aggregation.ask_vwap;
+            sj["aggregation"]["mid_price_sma"] = sym.aggregation.mid_price_sma;
+            sj["aggregation"]["spread_sma"] = sym.aggregation.spread_sma;
+            sj["aggregation"]["bid_ask_imbalance"] = sym.aggregation.bid_ask_imbalance;
+
+            // Order book depth (top 20 levels each side for dashboard)
+            nlohmann::json bids_arr = nlohmann::json::array();
+            int count = 0;
+            for (const auto& [price, qty] : sym.bids) {
+                if (++count > 20) break;
+                bids_arr.push_back({{"price", price}, {"qty", qty}});
+            }
+            sj["bids"] = bids_arr;
+
+            nlohmann::json asks_arr = nlohmann::json::array();
+            count = 0;
+            for (const auto& [price, qty] : sym.asks) {
+                if (++count > 20) break;
+                asks_arr.push_back({{"price", price}, {"qty", qty}});
+            }
+            sj["asks"] = asks_arr;
+
+            j["symbols"].push_back(sj);
+        }
+
+        return j.dump();
     }
 }
 
@@ -93,6 +187,7 @@ int main(int argc, char* argv[]) {
     }
 
     setup_logging(config.logging);
+    g_start_time = std::chrono::steady_clock::now();
 
     spdlog::info("=== {} v0.1.0 ===", config.name);
     spdlog::info("Config loaded from: {}", cli.config_path);
@@ -154,6 +249,43 @@ int main(int argc, char* argv[]) {
     processor.start(g_running);
     spdlog::info("Pipeline started");
 
+    // --- Monitoring servers ---
+    auto stats_fn = [&]() -> std::string {
+        return build_stats_json(processor,
+            feed_handler.get(), replay_engine.get(),
+            *queue, disk_logger.get());
+    };
+
+    mde::output::MetricsServer metrics_server(config.server.metrics_port, stats_fn);
+    metrics_server.start();
+
+    // Replay control handler for WebSocket commands
+    mde::output::ReplayController replay_ctrl;
+    if (replay_engine) {
+        replay_ctrl = [&](const std::string& msg) {
+            try {
+                auto j = nlohmann::json::parse(msg);
+                auto cmd = j.value("cmd", "");
+                if (cmd == "pause") replay_engine->pause();
+                else if (cmd == "resume") replay_engine->resume();
+                else if (cmd == "speed") {
+                    auto val = j.value("value", "1x");
+                    if (val == "1x") replay_engine->set_speed(mde::replay::PlaybackSpeed::REALTIME);
+                    else if (val == "2x") replay_engine->set_speed(mde::replay::PlaybackSpeed::FAST_2X);
+                    else if (val == "5x") replay_engine->set_speed(mde::replay::PlaybackSpeed::FAST_5X);
+                    else if (val == "max") replay_engine->set_speed(mde::replay::PlaybackSpeed::MAX);
+                }
+            } catch (...) {
+                spdlog::debug("WsServer: invalid command: {}", msg);
+            }
+        };
+    }
+
+    mde::output::WsServer ws_server(config.server.ws_port, stats_fn, replay_ctrl);
+    ws_server.start();
+
+    spdlog::info("Monitoring: HTTP :{} | WS :{}", config.server.metrics_port, config.server.ws_port);
+
     // Main thread: periodic status reporting
     while (g_running.load(std::memory_order_relaxed)) {
         std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -161,31 +293,34 @@ int main(int argc, char* argv[]) {
 
         if (replay_mode) {
             spdlog::info("Status [REPLAY] | replayed={}/{} processed={} signals={} "
-                         "queue_depth={} finished={} | latency(last): parse={}us queue={}us total={}us",
+                         "queue_depth={} ws_clients={} finished={} | "
+                         "latency(last): parse={}us queue={}us total={}us",
                 replay_engine->replayed_count(),
                 replay_engine->total_records(),
                 processor.processed_count(),
                 processor.signals_fired(),
                 queue->size_approx(),
+                ws_server.client_count(),
                 replay_engine->is_finished() ? "yes" : "no",
                 processor.last_parse_latency_us(),
                 processor.last_queue_latency_us(),
                 processor.last_total_latency_us());
 
-            // Auto-stop when replay is finished and queue is drained
             if (replay_engine->is_finished() && queue->empty()) {
                 spdlog::info("Replay complete, shutting down");
                 g_running.store(false, std::memory_order_relaxed);
             }
         } else {
             spdlog::info("Status | recv={} processed={} signals={} parse_err={} queue_full={} "
-                         "queue_depth={}{} | latency(last): parse={}us queue={}us total={}us",
+                         "queue_depth={} ws_clients={}{} | "
+                         "latency(last): parse={}us queue={}us total={}us",
                 feed_handler->message_count(),
                 processor.processed_count(),
                 processor.signals_fired(),
                 feed_handler->parse_error_count(),
                 feed_handler->queue_full_count(),
                 queue->size_approx(),
+                ws_server.client_count(),
                 disk_logger ? " rec=" + std::to_string(disk_logger->record_count()) : "",
                 processor.last_parse_latency_us(),
                 processor.last_queue_latency_us(),
@@ -194,6 +329,10 @@ int main(int argc, char* argv[]) {
     }
 
     // Graceful shutdown
+    spdlog::info("Stopping monitoring servers...");
+    ws_server.stop();
+    metrics_server.stop();
+
     if (replay_mode) {
         spdlog::info("Stopping replay engine...");
         replay_engine->stop();

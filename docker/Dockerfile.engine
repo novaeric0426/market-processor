@@ -1,0 +1,44 @@
+# --- Build stage ---
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential cmake git \
+    libboost-all-dev libssl-dev \
+    libspdlog-dev libyaml-cpp-dev \
+    nlohmann-json3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install simdjson from source (not in apt for 22.04)
+RUN git clone --depth 1 --branch v3.6.4 https://github.com/simdjson/simdjson.git /tmp/simdjson \
+    && cd /tmp/simdjson && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release -DSIMDJSON_BUILD_STATIC_LIB=ON \
+    && make -j$(nproc) && make install \
+    && rm -rf /tmp/simdjson
+
+WORKDIR /app
+COPY CMakeLists.txt CMakePresets.json ./
+COPY src/ src/
+
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
+    -DMDE_BUILD_TESTS=OFF -DMDE_BUILD_BENCH=OFF \
+    && cmake --build build --parallel $(nproc)
+
+# --- Runtime stage ---
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    libssl3 libspdlog1 libyaml-cpp0.7 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/build/market-engine /usr/local/bin/market-engine
+COPY config/ /app/config/
+
+WORKDIR /app
+RUN mkdir -p logs recordings
+
+EXPOSE 8080 8081
+
+ENTRYPOINT ["market-engine"]
+CMD ["config/prod.yaml"]

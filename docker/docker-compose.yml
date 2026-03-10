@@ -1,0 +1,27 @@
+services:
+  engine:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.engine
+    ports:
+      - "8080:8080"   # HTTP /stats
+      - "8081:8081"   # WebSocket (dashboard feed)
+    volumes:
+      - ../config:/app/config:ro
+      - engine-logs:/app/logs
+      - engine-recordings:/app/recordings
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard
+    ports:
+      - "3000:3000"   # Dashboard UI
+    depends_on:
+      - engine
+    restart: unless-stopped
+
+volumes:
+  engine-logs:
+  engine-recordings:

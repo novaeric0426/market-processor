@@ -30,3 +30,6 @@ recordings/
 dashboard/node_modules/
 dashboard/dist/
 dashboard/.env
+
+# Claude
+CLAUDE.md

@@ -1,0 +1,360 @@
+/* === Layout === */
+.app {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  background: #0d1117;
+  color: #c9d1d9;
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  border-bottom: 1px solid #21262d;
+  background: #161b22;
+}
+
+.app-header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: #f0f6fc;
+}
+
+.app-main {
+  display: flex;
+  gap: 16px;
+  padding: 16px 24px;
+}
+
+.left-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+.right-panel {
+  width: 360px;
+  flex-shrink: 0;
+}
+
+h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0f6fc;
+  margin: 0 0 8px 0;
+}
+
+h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b949e;
+  margin: 12px 0 6px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* === Connection Badge === */
+.connection-badge {
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.connection-badge.connected {
+  background: #0d3321;
+  color: #3fb950;
+  border: 1px solid #238636;
+}
+
+.connection-badge.connecting {
+  background: #2a1f00;
+  color: #d29922;
+  border: 1px solid #9e6a03;
+}
+
+.connection-badge.disconnected {
+  background: #3d1419;
+  color: #f85149;
+  border: 1px solid #da3633;
+}
+
+/* === Order Book Chart === */
+.orderbook-chart {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.orderbook-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.label-bid { color: #3fb950; }
+.label-ask { color: #f85149; }
+.mid-price { color: #8b949e; }
+
+.orderbook-body {
+  display: flex;
+  gap: 8px;
+}
+
+.orderbook-side {
+  flex: 1;
+}
+
+.depth-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  font-size: 11px;
+}
+
+.price {
+  width: 80px;
+  text-align: right;
+  font-weight: 500;
+}
+
+.bid-price { color: #3fb950; }
+.ask-price { color: #f85149; }
+
+.qty {
+  width: 65px;
+  text-align: right;
+  color: #8b949e;
+  font-size: 10px;
+}
+
+.bar-container {
+  flex: 1;
+  height: 14px;
+  background: #21262d;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.bids-side .bar-container {
+  direction: rtl;
+}
+
+.bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 150ms ease;
+}
+
+.bid-bar {
+  background: rgba(63, 185, 80, 0.35);
+  border-right: 2px solid #3fb950;
+}
+
+.bids-side .bid-bar {
+  border-right: none;
+  border-left: 2px solid #3fb950;
+}
+
+.ask-bar {
+  background: rgba(248, 81, 73, 0.35);
+  border-left: 2px solid #f85149;
+}
+
+.chart-empty {
+  color: #484f58;
+  font-size: 12px;
+  text-align: center;
+  padding: 40px;
+}
+
+.additional-symbol {
+  margin-top: 16px;
+}
+
+/* === Metrics Panel === */
+.metrics-panel {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.metrics-grid.small {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.metric-card {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.metric-label {
+  font-size: 10px;
+  color: #484f58;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.metric-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0f6fc;
+  margin-top: 2px;
+}
+
+.status-connected .metric-value { color: #3fb950; }
+.status-connecting .metric-value { color: #d29922; }
+.status-disconnected .metric-value { color: #f85149; }
+
+/* === Latency Bars === */
+.latency-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.latency-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.latency-label {
+  width: 40px;
+  color: #8b949e;
+}
+
+.latency-bar-track {
+  flex: 1;
+  height: 10px;
+  background: #21262d;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.latency-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 150ms ease;
+}
+
+.latency-value {
+  width: 40px;
+  text-align: right;
+  color: #c9d1d9;
+  font-weight: 500;
+}
+
+/* === Sparkline === */
+.sparkline-section {
+  margin-top: 4px;
+}
+
+.sparkline {
+  width: 100%;
+  display: block;
+}
+
+/* === Replay Controls === */
+.replay-controls {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.progress-container {
+  margin-bottom: 8px;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #21262d;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #1f6feb;
+  border-radius: 4px;
+  transition: width 200ms ease;
+}
+
+.progress-text {
+  font-size: 11px;
+  color: #8b949e;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #c9d1d9;
+  cursor: pointer;
+  transition: background 100ms;
+}
+
+.btn:hover:not(:disabled) {
+  background: #30363d;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #238636;
+  border-color: #2ea043;
+  color: #fff;
+}
+
+.btn-active {
+  background: #1f6feb;
+  border-color: #388bfd;
+  color: #fff;
+}
+
+.replay-finished {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #3fb950;
+  font-weight: 600;
+}
+
+/* === Feed/Replay Stats === */
+.feed-stats,
+.replay-stats {
+  border-top: 1px solid #21262d;
+  margin-top: 8px;
+  padding-top: 4px;
+}

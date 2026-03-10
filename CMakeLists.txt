@@ -26,6 +26,7 @@ add_library(mde_lib
     src/feed/feed_handler.cpp
     src/feed/depth_parser.cpp
     src/engine/processing_thread.cpp
+    src/engine/order_book.cpp
 )
 
 target_include_directories(mde_lib PUBLIC ${CMAKE_SOURCE_DIR}/src)
@@ -57,6 +58,10 @@ if(MDE_BUILD_TESTS)
     add_executable(test_depth_parser test/test_depth_parser.cpp)
     target_link_libraries(test_depth_parser PRIVATE mde_lib GTest::gtest_main)
     add_test(NAME test_depth_parser COMMAND test_depth_parser)
+
+    add_executable(test_order_book test/test_order_book.cpp)
+    target_link_libraries(test_order_book PRIVATE mde_lib GTest::gtest_main)
+    add_test(NAME test_order_book COMMAND test_order_book)
 endif()
 
 # --- Benchmarks ---

@@ -1,0 +1,32 @@
+# Build
+build/
+cmake-build-*/
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Compiled
+*.o
+*.a
+*.so
+*.dylib
+
+# Dependencies (if vendored)
+_deps/
+
+# Logs
+*.log
+
+# Recordings
+recordings/
+
+# Node (dashboard)
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.env

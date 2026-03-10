@@ -1,0 +1,34 @@
+engine:
+  name: "market-data-engine"
+
+feed:
+  url: "stream.binance.com"
+  port: "9443"
+  symbols:
+    - "btcusdt"
+    - "ethusdt"
+    - "bnbusdt"
+    - "solusdt"
+  streams:
+    - "depth@100ms"
+  reconnect:
+    initial_delay_ms: 100
+    max_delay_ms: 30000
+    multiplier: 2.0
+
+logging:
+  level: "info"
+  console: false
+  file:
+    enabled: true
+    path: "logs/engine.log"
+    max_size_mb: 100
+    max_files: 5
+
+server:
+  metrics_port: 8080
+  ws_port: 8081
+
+recording:
+  enabled: true
+  output_dir: "recordings/"

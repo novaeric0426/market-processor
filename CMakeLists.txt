@@ -29,6 +29,8 @@ add_library(mde_lib
     src/engine/order_book.cpp
     src/engine/aggregator.cpp
     src/engine/signal_detector.cpp
+    src/output/disk_logger.cpp
+    src/replay/replay_engine.cpp
 )
 
 target_include_directories(mde_lib PUBLIC ${CMAKE_SOURCE_DIR}/src)
@@ -72,6 +74,14 @@ if(MDE_BUILD_TESTS)
     add_executable(test_signal_detector test/test_signal_detector.cpp)
     target_link_libraries(test_signal_detector PRIVATE mde_lib GTest::gtest_main)
     add_test(NAME test_signal_detector COMMAND test_signal_detector)
+
+    add_executable(test_disk_logger test/test_disk_logger.cpp)
+    target_link_libraries(test_disk_logger PRIVATE mde_lib GTest::gtest_main)
+    add_test(NAME test_disk_logger COMMAND test_disk_logger)
+
+    add_executable(test_replay_engine test/test_replay_engine.cpp)
+    target_link_libraries(test_replay_engine PRIVATE mde_lib GTest::gtest_main)
+    add_test(NAME test_replay_engine COMMAND test_replay_engine)
 endif()
 
 # --- Benchmarks ---

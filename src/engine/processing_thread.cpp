@@ -7,8 +7,10 @@
 namespace mde::engine {
 
 ProcessingThread::ProcessingThread(feed::FeedQueue& queue,
-                                   std::vector<SignalCondition> signal_conditions)
+                                   std::vector<SignalCondition> signal_conditions,
+                                   output::DiskLogger* recorder)
     : queue_(queue)
+    , recorder_(recorder)
     , signal_detector_([this](const Signal& sig) {
           signals_fired_.fetch_add(1, std::memory_order_relaxed);
           spdlog::info("SIGNAL [{}] {} value={:.6f} threshold={:.6f}",
@@ -60,6 +62,11 @@ void ProcessingThread::run(std::atomic<bool>& running) {
 
 void ProcessingThread::process(core::QueueMessage& msg) {
     auto count = processed_.fetch_add(1, std::memory_order_relaxed) + 1;
+
+    // Record raw data before processing (if recording enabled)
+    if (recorder_) {
+        recorder_->write(msg.depth);
+    }
 
     // Compute per-stage latencies
     auto parse_us = core::Clock::elapsed_us(msg.depth.ts_received, msg.depth.ts_parsed);

@@ -4,6 +4,7 @@
 #include "engine/order_book.h"
 #include "engine/aggregator.h"
 #include "engine/signal_detector.h"
+#include "output/disk_logger.h"
 #include "core/types.h"
 #include "core/clock.h"
 
@@ -16,11 +17,12 @@
 namespace mde::engine {
 
 // Consumes messages from the SPSC queue on a dedicated thread.
-// Pipeline: dequeue → order book update → aggregation → signal detection.
+// Pipeline: dequeue → record (optional) → order book update → aggregation → signal detection.
 class ProcessingThread {
 public:
     ProcessingThread(feed::FeedQueue& queue,
-                     std::vector<SignalCondition> signal_conditions = {});
+                     std::vector<SignalCondition> signal_conditions = {},
+                     output::DiskLogger* recorder = nullptr);
     ~ProcessingThread();
 
     void start(std::atomic<bool>& running);
@@ -50,6 +52,7 @@ private:
     SymbolState& get_or_create_state(const std::string& symbol);
 
     feed::FeedQueue& queue_;
+    output::DiskLogger* recorder_;   // Non-owning, nullable. Records every processed message.
     std::thread thread_;
     std::unordered_map<std::string, std::unique_ptr<SymbolState>> states_;
     SignalDetector signal_detector_;

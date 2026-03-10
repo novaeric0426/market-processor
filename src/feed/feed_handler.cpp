@@ -1,5 +1,6 @@
 #include "feed/feed_handler.h"
 #include "core/clock.h"
+#include "core/thread_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -22,6 +23,8 @@ void FeedHandler::start(std::atomic<bool>& running) {
     );
 
     feed_thread_ = std::thread([this, &running]() {
+        core::set_thread_name("mde_feed");
+        core::set_thread_affinity(0);  // Pin to CPU 0 (Linux only)
         spdlog::info("Feed thread started");
         ws_client_->run(running);
         spdlog::info("Feed thread exited");

@@ -1,4 +1,5 @@
 #include "engine/processing_thread.h"
+#include "core/thread_utils.h"
 
 #include <spdlog/spdlog.h>
 #include <thread>
@@ -29,6 +30,8 @@ ProcessingThread::~ProcessingThread() {
 
 void ProcessingThread::start(std::atomic<bool>& running) {
     thread_ = std::thread([this, &running]() {
+        core::set_thread_name("mde_process");
+        core::set_thread_affinity(1);  // Pin to CPU 1 (Linux only)
         spdlog::info("Processing thread started");
         run(running);
         spdlog::info("Processing thread exited");

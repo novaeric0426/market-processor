@@ -10,11 +10,37 @@
 
 #include <atomic>
 #include <thread>
+#include <mutex>
 #include <cstdint>
 #include <unordered_map>
+#include <map>
 #include <memory>
+#include <vector>
 
 namespace mde::engine {
+
+// Thread-safe snapshot of a single symbol's state.
+struct SymbolSnapshot {
+    std::string symbol;
+    std::map<double, double, std::greater<>> bids;  // price→qty, descending
+    std::map<double, double> asks;                    // price→qty, ascending
+    AggregatorSnapshot aggregation;
+    double best_bid = 0.0;
+    double best_ask = 0.0;
+    double spread = 0.0;
+    double mid_price = 0.0;
+    uint64_t update_count = 0;
+};
+
+// Complete engine state snapshot, safe to read from any thread.
+struct EngineSnapshot {
+    std::vector<SymbolSnapshot> symbols;
+    uint64_t processed_count = 0;
+    uint64_t signals_fired = 0;
+    int64_t last_parse_us = 0;
+    int64_t last_queue_us = 0;
+    int64_t last_total_us = 0;
+};
 
 // Consumes messages from the SPSC queue on a dedicated thread.
 // Pipeline: dequeue → record (optional) → order book update → aggregation → signal detection.
@@ -40,6 +66,10 @@ public:
     const OrderBook* get_order_book(const std::string& symbol) const;
     const AggregatorSnapshot* get_aggregator(const std::string& symbol) const;
 
+    // Thread-safe snapshot of all symbol states + metrics.
+    // Safe to call from any thread (mutex-protected).
+    EngineSnapshot take_snapshot() const;
+
 private:
     struct SymbolState {
         OrderBook book;
@@ -51,10 +81,14 @@ private:
     void process(core::QueueMessage& msg);
     SymbolState& get_or_create_state(const std::string& symbol);
 
+    void update_snapshot();
+
     feed::FeedQueue& queue_;
     output::DiskLogger* recorder_;   // Non-owning, nullable. Records every processed message.
     std::thread thread_;
     std::unordered_map<std::string, std::unique_ptr<SymbolState>> states_;
+    mutable std::mutex snapshot_mutex_;
+    EngineSnapshot snapshot_;
     SignalDetector signal_detector_;
     std::vector<SignalCondition> signal_conditions_;
 

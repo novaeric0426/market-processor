@@ -85,6 +85,9 @@ void ProcessingThread::process(core::QueueMessage& msg) {
     // Run signal detection
     signal_detector_.evaluate(msg.depth.symbol, state.book, state.aggregator.snapshot());
 
+    // Publish snapshot for monitoring servers (every message)
+    update_snapshot();
+
     // Periodic logging
     if (count <= 3 || count % 100 == 0) {
         const auto& snap = state.aggregator.snapshot();
@@ -116,6 +119,36 @@ const OrderBook* ProcessingThread::get_order_book(const std::string& symbol) con
 const AggregatorSnapshot* ProcessingThread::get_aggregator(const std::string& symbol) const {
     auto it = states_.find(symbol);
     return it != states_.end() ? &it->second->aggregator.snapshot() : nullptr;
+}
+
+void ProcessingThread::update_snapshot() {
+    std::lock_guard<std::mutex> lock(snapshot_mutex_);
+    snapshot_.processed_count = processed_.load(std::memory_order_relaxed);
+    snapshot_.signals_fired = signals_fired_.load(std::memory_order_relaxed);
+    snapshot_.last_parse_us = last_parse_us_.load(std::memory_order_relaxed);
+    snapshot_.last_queue_us = last_queue_us_.load(std::memory_order_relaxed);
+    snapshot_.last_total_us = last_total_us_.load(std::memory_order_relaxed);
+
+    snapshot_.symbols.clear();
+    snapshot_.symbols.reserve(states_.size());
+    for (const auto& [sym, state] : states_) {
+        SymbolSnapshot ss;
+        ss.symbol = sym;
+        ss.bids = state->book.bids();
+        ss.asks = state->book.asks();
+        ss.aggregation = state->aggregator.snapshot();
+        ss.best_bid = state->book.best_bid_price();
+        ss.best_ask = state->book.best_ask_price();
+        ss.spread = state->book.spread();
+        ss.mid_price = state->book.mid_price();
+        ss.update_count = state->book.update_count();
+        snapshot_.symbols.push_back(std::move(ss));
+    }
+}
+
+EngineSnapshot ProcessingThread::take_snapshot() const {
+    std::lock_guard<std::mutex> lock(snapshot_mutex_);
+    return snapshot_;
 }
 
 } // namespace mde::engine

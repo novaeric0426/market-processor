@@ -30,6 +30,7 @@ add_library(mde_lib
     src/engine/aggregator.cpp
     src/engine/signal_detector.cpp
     src/output/disk_logger.cpp
+    src/output/metrics_server.cpp
     src/replay/replay_engine.cpp
 )
 

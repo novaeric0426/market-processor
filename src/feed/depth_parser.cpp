@@ -21,8 +21,30 @@ double fast_atof(std::string_view sv) {
 } // namespace
 
 bool DepthParser::parse(std::string_view json, core::DepthUpdate& out) {
-    // simdjson requires padded input — pad the string
-    simdjson::padded_string padded(json);
+    // Detect combined stream format by checking for "data" key in raw JSON.
+    // This avoids consuming the simdjson ondemand document prematurely.
+    bool combined = (json.find("\"data\"") != std::string_view::npos);
+
+    std::string_view inner_json = json;
+    simdjson::padded_string padded_outer;
+    simdjson::ondemand::document doc_outer;
+
+    if (combined) {
+        // Parse outer envelope to extract "data" object as raw JSON
+        padded_outer = simdjson::padded_string(json);
+        auto err = parser_.iterate(padded_outer).get(doc_outer);
+        if (err) {
+            spdlog::warn("JSON parse error (outer): {}", simdjson::error_message(err));
+            return false;
+        }
+        std::string_view data_raw;
+        if (doc_outer["data"].raw_json().get(data_raw)) {
+            return false;
+        }
+        inner_json = data_raw;
+    }
+
+    simdjson::padded_string padded(inner_json);
     simdjson::ondemand::document doc;
 
     auto err = parser_.iterate(padded).get(doc);

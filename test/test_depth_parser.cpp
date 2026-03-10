@@ -122,6 +122,33 @@ TEST(DepthParser, ManyLevelsCapped) {
     EXPECT_EQ(update.bid_count, DepthUpdate::MAX_LEVELS);
 }
 
+TEST(DepthParser, ParseCombinedStreamFormat) {
+    DepthParser parser;
+    DepthUpdate update;
+
+    // Binance combined stream wraps data in {"stream":"...","data":{...}}
+    std::string msg = R"({
+        "stream": "btcusdt@depth@100ms",
+        "data": {
+            "e": "depthUpdate",
+            "E": 1672531200000,
+            "s": "BTCUSDT",
+            "U": 200001,
+            "u": 200010,
+            "b": [["50000.00", "1.00"]],
+            "a": [["50001.00", "2.00"]]
+        }
+    })";
+
+    ASSERT_TRUE(parser.parse(msg, update));
+    EXPECT_EQ(update.symbol, "BTCUSDT");
+    EXPECT_EQ(update.first_update_id, 200001ULL);
+    EXPECT_EQ(update.bid_count, 1);
+    EXPECT_DOUBLE_EQ(update.bids[0].price, 50000.0);
+    EXPECT_EQ(update.ask_count, 1);
+    EXPECT_DOUBLE_EQ(update.asks[0].price, 50001.0);
+}
+
 TEST(DepthParser, ReuseParser) {
     DepthParser parser;
     DepthUpdate update;

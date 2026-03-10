@@ -1,5 +1,5 @@
 # --- Build stage ---
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -7,15 +7,8 @@ RUN apt-get update && apt-get install -y \
     build-essential cmake git \
     libboost-all-dev libssl-dev \
     libspdlog-dev libyaml-cpp-dev \
-    nlohmann-json3-dev \
+    libsimdjson-dev nlohmann-json3-dev \
     && rm -rf /var/lib/apt/lists/*
-
-# Install simdjson from source (not in apt for 22.04)
-RUN git clone --depth 1 --branch v3.6.4 https://github.com/simdjson/simdjson.git /tmp/simdjson \
-    && cd /tmp/simdjson && mkdir build && cd build \
-    && cmake .. -DCMAKE_BUILD_TYPE=Release -DSIMDJSON_BUILD_STATIC_LIB=ON \
-    && make -j$(nproc) && make install \
-    && rm -rf /tmp/simdjson
 
 WORKDIR /app
 COPY CMakeLists.txt CMakePresets.json ./
@@ -26,10 +19,10 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
     && cmake --build build --parallel $(nproc)
 
 # --- Runtime stage ---
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
-RUN apt-get update && apt-get install -y \
-    libssl3 libspdlog1 libyaml-cpp0.7 \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libssl3t64 libspdlog1.12 libyaml-cpp0.8 libsimdjson-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/build/market-engine /usr/local/bin/market-engine

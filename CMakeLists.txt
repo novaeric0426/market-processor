@@ -68,6 +68,10 @@ if(MDE_BUILD_TESTS)
     add_executable(test_aggregator test/test_aggregator.cpp)
     target_link_libraries(test_aggregator PRIVATE mde_lib GTest::gtest_main)
     add_test(NAME test_aggregator COMMAND test_aggregator)
+
+    add_executable(test_signal_detector test/test_signal_detector.cpp)
+    target_link_libraries(test_signal_detector PRIVATE mde_lib GTest::gtest_main)
+    add_test(NAME test_signal_detector COMMAND test_signal_detector)
 endif()
 
 # --- Benchmarks ---

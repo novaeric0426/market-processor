@@ -49,7 +49,12 @@ void ProcessingThread::run(std::atomic<bool>& running) {
 
     while (running.load(std::memory_order_relaxed)) {
         if (queue_.try_pop(msg)) {
-            msg.depth.ts_dequeued = core::Clock::now();
+            auto now = core::Clock::now();
+            if (msg.type == core::MessageType::TRADE) {
+                msg.trade.ts_dequeued = now;
+            } else {
+                msg.depth.ts_dequeued = now;
+            }
             process(msg);
         } else {
             std::this_thread::yield();
@@ -58,49 +63,90 @@ void ProcessingThread::run(std::atomic<bool>& running) {
 
     // Drain remaining messages
     while (queue_.try_pop(msg)) {
-        msg.depth.ts_dequeued = core::Clock::now();
+        auto now = core::Clock::now();
+        if (msg.type == core::MessageType::TRADE) {
+            msg.trade.ts_dequeued = now;
+        } else {
+            msg.depth.ts_dequeued = now;
+        }
         process(msg);
     }
 }
 
 void ProcessingThread::process(core::QueueMessage& msg) {
-    auto count = processed_.fetch_add(1, std::memory_order_relaxed) + 1;
+    processed_.fetch_add(1, std::memory_order_relaxed);
+
+    if (msg.type == core::MessageType::TRADE) {
+        process_trade(msg.trade);
+    } else {
+        process_depth(msg.depth);
+    }
+
+    // Publish snapshot for monitoring servers
+    update_snapshot();
+}
+
+void ProcessingThread::process_depth(core::DepthUpdate& depth) {
+    auto count = processed_.load(std::memory_order_relaxed);
 
     // Record raw data before processing (if recording enabled)
     if (recorder_) {
-        recorder_->write(msg.depth);
+        recorder_->write(depth);
     }
 
     // Compute per-stage latencies
-    auto parse_us = core::Clock::elapsed_us(msg.depth.ts_received, msg.depth.ts_parsed);
-    auto queue_us = core::Clock::elapsed_us(msg.depth.ts_parsed, msg.depth.ts_dequeued);
-    auto total_us = core::Clock::elapsed_us(msg.depth.ts_received, msg.depth.ts_dequeued);
+    auto parse_us = core::Clock::elapsed_us(depth.ts_received, depth.ts_parsed);
+    auto queue_us = core::Clock::elapsed_us(depth.ts_parsed, depth.ts_dequeued);
+    auto total_us = core::Clock::elapsed_us(depth.ts_received, depth.ts_dequeued);
 
     last_parse_us_.store(parse_us, std::memory_order_relaxed);
     last_queue_us_.store(queue_us, std::memory_order_relaxed);
     last_total_us_.store(total_us, std::memory_order_relaxed);
 
     // Update order book and aggregator
-    auto& state = get_or_create_state(msg.depth.symbol);
-    state.book.apply_update(msg.depth);
+    auto& state = get_or_create_state(depth.symbol);
+    state.book.apply_update(depth);
     state.aggregator.update(state.book);
 
-    // Run signal detection
-    signal_detector_.evaluate(msg.depth.symbol, state.book, state.aggregator.snapshot());
-
-    // Publish snapshot for monitoring servers (every message)
-    update_snapshot();
+    // Run signal detection (include trade stats if available)
+    const auto& trade_snap = state.trade_aggregator.snapshot();
+    const TradeAggregatorSnapshot* trade_ptr =
+        (trade_snap.trade_count > 0) ? &trade_snap : nullptr;
+    signal_detector_.evaluate(depth.symbol, state.book, state.aggregator.snapshot(), trade_ptr);
 
     // Periodic logging
     if (count <= 3 || count % 100 == 0) {
         const auto& snap = state.aggregator.snapshot();
-        spdlog::debug("[processed #{}] {} bid={:.2f} ask={:.2f} spread={:.2f} "
+        spdlog::debug("[depth #{}] {} bid={:.2f} ask={:.2f} spread={:.2f} "
                       "mid_sma={:.2f} imbalance={:.3f} | "
                       "parse={}us queue={}us total={}us",
-            count, msg.depth.symbol,
+            count, depth.symbol,
             state.book.best_bid_price(), state.book.best_ask_price(),
             snap.spread, snap.mid_price_sma, snap.bid_ask_imbalance,
             parse_us, queue_us, total_us);
+    }
+}
+
+void ProcessingThread::process_trade(core::Trade& trade) {
+    auto trade_count = trades_processed_.fetch_add(1, std::memory_order_relaxed) + 1;
+
+    auto parse_us = core::Clock::elapsed_us(trade.ts_received, trade.ts_parsed);
+    auto total_us = core::Clock::elapsed_us(trade.ts_received, trade.ts_dequeued);
+
+    // Update trade aggregator
+    auto& state = get_or_create_state(trade.symbol);
+    state.trade_aggregator.update(trade);
+
+    // Periodic logging
+    if (trade_count <= 3 || trade_count % 500 == 0) {
+        const auto& snap = state.trade_aggregator.snapshot();
+        spdlog::debug("[trade #{}] {} price={:.2f} qty={:.4f} side={} | "
+                      "imbalance={:.3f} vol={:.4f} vol_sma={:.4f} | "
+                      "parse={}us total={}us",
+            trade_count, trade.symbol, trade.price, trade.quantity,
+            trade.is_buyer_maker ? "sell" : "buy",
+            snap.trade_imbalance, snap.total_volume, snap.volume_sma,
+            parse_us, total_us);
     }
 }
 
@@ -127,6 +173,7 @@ const AggregatorSnapshot* ProcessingThread::get_aggregator(const std::string& sy
 void ProcessingThread::update_snapshot() {
     std::lock_guard<std::mutex> lock(snapshot_mutex_);
     snapshot_.processed_count = processed_.load(std::memory_order_relaxed);
+    snapshot_.trades_processed = trades_processed_.load(std::memory_order_relaxed);
     snapshot_.signals_fired = signals_fired_.load(std::memory_order_relaxed);
     snapshot_.last_parse_us = last_parse_us_.load(std::memory_order_relaxed);
     snapshot_.last_queue_us = last_queue_us_.load(std::memory_order_relaxed);

@@ -27,9 +27,11 @@ add_library(mde_lib
     src/feed/ws_client.cpp
     src/feed/feed_handler.cpp
     src/feed/depth_parser.cpp
+    src/feed/trade_parser.cpp
     src/engine/processing_thread.cpp
     src/engine/order_book.cpp
     src/engine/aggregator.cpp
+    src/engine/trade_aggregator.cpp
     src/engine/signal_detector.cpp
     src/output/disk_logger.cpp
     src/output/metrics_server.cpp
@@ -67,6 +69,10 @@ if(MDE_BUILD_TESTS)
     target_link_libraries(test_depth_parser PRIVATE mde_lib GTest::gtest_main)
     add_test(NAME test_depth_parser COMMAND test_depth_parser)
 
+    add_executable(test_trade_parser test/test_trade_parser.cpp)
+    target_link_libraries(test_trade_parser PRIVATE mde_lib GTest::gtest_main)
+    add_test(NAME test_trade_parser COMMAND test_trade_parser)
+
     add_executable(test_order_book test/test_order_book.cpp)
     target_link_libraries(test_order_book PRIVATE mde_lib GTest::gtest_main)
     add_test(NAME test_order_book COMMAND test_order_book)
@@ -74,6 +80,10 @@ if(MDE_BUILD_TESTS)
     add_executable(test_aggregator test/test_aggregator.cpp)
     target_link_libraries(test_aggregator PRIVATE mde_lib GTest::gtest_main)
     add_test(NAME test_aggregator COMMAND test_aggregator)
+
+    add_executable(test_trade_aggregator test/test_trade_aggregator.cpp)
+    target_link_libraries(test_trade_aggregator PRIVATE mde_lib GTest::gtest_main)
+    add_test(NAME test_trade_aggregator COMMAND test_trade_aggregator)
 
     add_executable(test_signal_detector test/test_signal_detector.cpp)
     target_link_libraries(test_signal_detector PRIVATE mde_lib GTest::gtest_main)

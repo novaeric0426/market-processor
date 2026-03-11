@@ -73,6 +73,7 @@ namespace {
         j["uptime_s"] = uptime_s;
         j["mode"] = replay ? "replay" : "live";
         j["processed"] = snapshot.processed_count;
+        j["trades_processed"] = snapshot.trades_processed;
         j["signals_fired"] = snapshot.signals_fired;
         j["queue_depth"] = queue.size_approx();
 
@@ -214,6 +215,11 @@ int main(int argc, char* argv[]) {
         {mde::engine::SignalType::IMBALANCE_BID, 0.7},
         {mde::engine::SignalType::IMBALANCE_ASK, 0.7},
         {mde::engine::SignalType::PRICE_DEVIATION, 0.001},
+        {mde::engine::SignalType::TRADE_IMBALANCE_BUY, 0.6},
+        {mde::engine::SignalType::TRADE_IMBALANCE_SELL, 0.6},
+        {mde::engine::SignalType::VOLUME_SPIKE, 3.0},       // 3x SMA
+        {mde::engine::SignalType::BOOK_PRESSURE_BID, 0.15},
+        {mde::engine::SignalType::BOOK_PRESSURE_ASK, 0.15},
     };
 
     // --- Recording (live mode only) ---
@@ -311,11 +317,12 @@ int main(int argc, char* argv[]) {
                 g_running.store(false, std::memory_order_relaxed);
             }
         } else {
-            spdlog::info("Status | recv={} processed={} signals={} parse_err={} queue_full={} "
+            spdlog::info("Status | recv={} processed={} trades={} signals={} parse_err={} queue_full={} "
                          "queue_depth={} ws_clients={}{} | "
                          "latency(last): parse={}us queue={}us total={}us",
                 feed_handler->message_count(),
                 processor.processed_count(),
+                processor.trades_processed(),
                 processor.signals_fired(),
                 feed_handler->parse_error_count(),
                 feed_handler->queue_full_count(),

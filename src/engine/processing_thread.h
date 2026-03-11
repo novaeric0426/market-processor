@@ -3,6 +3,7 @@
 #include "feed/feed_handler.h"
 #include "engine/order_book.h"
 #include "engine/aggregator.h"
+#include "engine/trade_aggregator.h"
 #include "engine/signal_detector.h"
 #include "output/disk_logger.h"
 #include "core/types.h"
@@ -36,6 +37,7 @@ struct SymbolSnapshot {
 struct EngineSnapshot {
     std::vector<SymbolSnapshot> symbols;
     uint64_t processed_count = 0;
+    uint64_t trades_processed = 0;
     uint64_t signals_fired = 0;
     int64_t last_parse_us = 0;
     int64_t last_queue_us = 0;
@@ -55,6 +57,7 @@ public:
     void stop();
 
     uint64_t processed_count() const { return processed_.load(std::memory_order_relaxed); }
+    uint64_t trades_processed() const { return trades_processed_.load(std::memory_order_relaxed); }
     uint64_t signals_fired() const { return signals_fired_.load(std::memory_order_relaxed); }
 
     // Latency stats (microseconds)
@@ -74,11 +77,14 @@ private:
     struct SymbolState {
         OrderBook book;
         Aggregator aggregator;
+        TradeAggregator trade_aggregator;
         SymbolState(const std::string& sym) : book(sym) {}
     };
 
     void run(std::atomic<bool>& running);
     void process(core::QueueMessage& msg);
+    void process_depth(core::DepthUpdate& depth);
+    void process_trade(core::Trade& trade);
     SymbolState& get_or_create_state(const std::string& symbol);
 
     void update_snapshot();
@@ -93,6 +99,7 @@ private:
     std::vector<SignalCondition> signal_conditions_;
 
     std::atomic<uint64_t> processed_{0};
+    std::atomic<uint64_t> trades_processed_{0};
     std::atomic<uint64_t> signals_fired_{0};
     std::atomic<int64_t> last_parse_us_{0};
     std::atomic<int64_t> last_queue_us_{0};

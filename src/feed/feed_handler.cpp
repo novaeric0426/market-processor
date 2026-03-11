@@ -44,37 +44,59 @@ void FeedHandler::on_message(const char* data, std::size_t len) {
     auto ts_received = core::Clock::now();
     auto count = msg_count_.fetch_add(1, std::memory_order_relaxed) + 1;
 
-    // Parse JSON into DepthUpdate
+    std::string_view json(data, len);
     core::QueueMessage msg;
-    msg.type = core::MessageType::DEPTH_UPDATE;
-    msg.depth.ts_received = ts_received;
 
-    if (!parser_.parse(std::string_view(data, len), msg.depth)) {
-        parse_errors_.fetch_add(1, std::memory_order_relaxed);
-        if (count <= 5) {
-            spdlog::warn("[msg #{}] Parse failed ({} bytes)", count, len);
+    // Detect message type from raw JSON to avoid double-parsing.
+    // Trade messages contain "\"e\":\"trade\"", depth contains "\"e\":\"depthUpdate\"".
+    if (json.find("\"trade\"") != std::string_view::npos) {
+        msg.type = core::MessageType::TRADE;
+        msg.trade.ts_received = ts_received;
+
+        if (!trade_parser_.parse(json, msg.trade)) {
+            parse_errors_.fetch_add(1, std::memory_order_relaxed);
+            if (count <= 5) {
+                spdlog::warn("[msg #{}] Trade parse failed ({} bytes)", count, len);
+            }
+            return;
         }
-        return;
-    }
 
-    auto ts_parsed = core::Clock::now();
-    msg.depth.ts_parsed = ts_parsed;
-    msg.depth.ts_enqueued = ts_parsed; // Best approximation before push
+        auto ts_parsed = core::Clock::now();
+        msg.trade.ts_parsed = ts_parsed;
+        msg.trade.ts_enqueued = ts_parsed;
 
-    // Capture values before move
-    auto symbol = msg.depth.symbol;
-    auto bid_count = msg.depth.bid_count;
-    auto ask_count = msg.depth.ask_count;
+        if (count <= 3) {
+            auto parse_us = core::Clock::elapsed_us(ts_received, ts_parsed);
+            spdlog::debug("[msg #{}] trade {} price={:.2f} qty={:.4f} side={} parse={}us",
+                count, msg.trade.symbol, msg.trade.price, msg.trade.quantity,
+                msg.trade.is_buyer_maker ? "sell" : "buy", parse_us);
+        }
+    } else {
+        msg.type = core::MessageType::DEPTH_UPDATE;
+        msg.depth.ts_received = ts_received;
 
-    if (count == 1) {
-        spdlog::info("First message parsed: {} bids={} asks={} ({} bytes)",
-            symbol, bid_count, ask_count, len);
-    }
+        if (!depth_parser_.parse(json, msg.depth)) {
+            parse_errors_.fetch_add(1, std::memory_order_relaxed);
+            if (count <= 5) {
+                spdlog::warn("[msg #{}] Depth parse failed ({} bytes)", count, len);
+            }
+            return;
+        }
 
-    if (count <= 3) {
-        auto parse_us = core::Clock::elapsed_us(ts_received, ts_parsed);
-        spdlog::debug("[msg #{}] parse_latency={}us symbol={} bids={} asks={}",
-            count, parse_us, symbol, bid_count, ask_count);
+        auto ts_parsed = core::Clock::now();
+        msg.depth.ts_parsed = ts_parsed;
+        msg.depth.ts_enqueued = ts_parsed;
+
+        if (count == 1) {
+            spdlog::info("First depth message: {} bids={} asks={} ({} bytes)",
+                msg.depth.symbol, msg.depth.bid_count, msg.depth.ask_count, len);
+        }
+
+        if (count <= 3) {
+            auto parse_us = core::Clock::elapsed_us(ts_received, ts_parsed);
+            spdlog::debug("[msg #{}] depth {} bids={} asks={} parse={}us",
+                count, msg.depth.symbol, msg.depth.bid_count, msg.depth.ask_count, parse_us);
+        }
     }
 
     // Enqueue

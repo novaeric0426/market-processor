@@ -11,6 +11,7 @@ feed:
     - "solusdt"
   streams:
     - "depth@100ms"
+    - "trade"
   reconnect:
     initial_delay_ms: 100
     max_delay_ms: 30000

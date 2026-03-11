@@ -3,6 +3,7 @@
 #include "config/config_loader.h"
 #include "feed/ws_client.h"
 #include "feed/depth_parser.h"
+#include "feed/trade_parser.h"
 #include "core/types.h"
 #include "core/spsc_queue.h"
 
@@ -38,7 +39,8 @@ private:
 
     config::FeedConfig feed_cfg_;
     FeedQueue& queue_;
-    DepthParser parser_;
+    DepthParser depth_parser_;
+    TradeParser trade_parser_;
     std::unique_ptr<WsClient> ws_client_;
     std::thread feed_thread_;
     std::atomic<uint64_t> msg_count_{0};

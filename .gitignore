@@ -33,3 +33,6 @@ dashboard/.env
 
 # Claude
 CLAUDE.md
+
+# Background Info
+background/

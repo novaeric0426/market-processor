@@ -227,8 +227,8 @@ int main(int argc, char* argv[]) {
         {mde::engine::SignalType::IMBALANCE_BID, 0.7},
         {mde::engine::SignalType::IMBALANCE_ASK, 0.7},
         {mde::engine::SignalType::PRICE_DEVIATION, 0.001},
-        {mde::engine::SignalType::TRADE_IMBALANCE_BUY, 0.6},
-        {mde::engine::SignalType::TRADE_IMBALANCE_SELL, 0.6},
+        {mde::engine::SignalType::TRADE_IMBALANCE_BUY, 0.8, 3'000'000},
+        {mde::engine::SignalType::TRADE_IMBALANCE_SELL, 0.8, 3'000'000},
         {mde::engine::SignalType::VOLUME_SPIKE, 3.0},       // 3x SMA
         {mde::engine::SignalType::BOOK_PRESSURE_BID, 0.15},
         {mde::engine::SignalType::BOOK_PRESSURE_ASK, 0.15},

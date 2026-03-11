@@ -6,6 +6,7 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <functional>
 #include <cstdint>
 
@@ -37,6 +38,7 @@ struct Signal {
 struct SignalCondition {
     SignalType type;
     double threshold;
+    uint64_t cooldown_us = 1'000'000;  // Suppress re-fire for this duration (default 1s)
 };
 
 // Callback invoked when a signal fires.
@@ -58,11 +60,29 @@ public:
                   const TradeAggregatorSnapshot* trade_agg = nullptr);
 
     uint64_t signals_fired() const { return signals_fired_; }
+    uint64_t signals_suppressed() const { return suppressed_; }
 
 private:
+    // Key for cooldown tracking: signal type + symbol
+    struct CooldownKey {
+        SignalType type;
+        std::string symbol;
+        bool operator==(const CooldownKey& o) const {
+            return type == o.type && symbol == o.symbol;
+        }
+    };
+    struct CooldownKeyHash {
+        size_t operator()(const CooldownKey& k) const {
+            return std::hash<uint8_t>()(static_cast<uint8_t>(k.type))
+                 ^ (std::hash<std::string>()(k.symbol) << 8);
+        }
+    };
+
     SignalCallback callback_;
     std::vector<SignalCondition> conditions_;
+    std::unordered_map<CooldownKey, uint64_t, CooldownKeyHash> last_fired_;
     uint64_t signals_fired_ = 0;
+    uint64_t suppressed_ = 0;
 };
 
 // Human-readable signal type name.

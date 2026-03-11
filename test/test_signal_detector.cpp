@@ -170,6 +170,70 @@ TEST(SignalDetector, SkipsEmptyAggregator) {
     EXPECT_TRUE(fired.empty());
 }
 
+TEST(SignalDetector, CooldownSuppressesDuplicate) {
+    std::vector<Signal> fired;
+    SignalDetector detector([&](const Signal& s) { fired.push_back(s); });
+    // 1 second cooldown (default)
+    detector.add_condition({SignalType::SPREAD_WIDE, 5.0});
+
+    OrderBook book("BTCUSDT");
+    Aggregator agg;
+
+    // Spread = 10, fires on first evaluate
+    book.apply_update(make_update({{100.0, 1.0}}, {{110.0, 1.0}}));
+    agg.update(book);
+    detector.evaluate("BTCUSDT", book, agg.snapshot());
+    ASSERT_EQ(fired.size(), 1u);
+
+    // Second evaluate immediately — should be suppressed by cooldown
+    detector.evaluate("BTCUSDT", book, agg.snapshot());
+    EXPECT_EQ(fired.size(), 1u);
+    EXPECT_EQ(detector.signals_suppressed(), 1u);
+}
+
+TEST(SignalDetector, CooldownAllowsDifferentSymbol) {
+    std::vector<Signal> fired;
+    SignalDetector detector([&](const Signal& s) { fired.push_back(s); });
+    detector.add_condition({SignalType::SPREAD_WIDE, 5.0});
+
+    OrderBook book_btc("BTCUSDT");
+    OrderBook book_eth("ETHUSDT");
+    Aggregator agg_btc, agg_eth;
+
+    book_btc.apply_update(make_update({{100.0, 1.0}}, {{110.0, 1.0}}));
+    agg_btc.update(book_btc);
+    detector.evaluate("BTCUSDT", book_btc, agg_btc.snapshot());
+
+    // Different symbol — should fire even though same type
+    auto eth_update = make_update({{200.0, 1.0}}, {{220.0, 1.0}});
+    eth_update.symbol = "ETHUSDT";
+    book_eth.apply_update(eth_update);
+    agg_eth.update(book_eth);
+    detector.evaluate("ETHUSDT", book_eth, agg_eth.snapshot());
+
+    EXPECT_EQ(fired.size(), 2u);
+    EXPECT_EQ(fired[0].symbol, "BTCUSDT");
+    EXPECT_EQ(fired[1].symbol, "ETHUSDT");
+}
+
+TEST(SignalDetector, ZeroCooldownAlwaysFires) {
+    std::vector<Signal> fired;
+    SignalDetector detector([&](const Signal& s) { fired.push_back(s); });
+    detector.add_condition({SignalType::SPREAD_WIDE, 5.0, 0}); // 0 = no cooldown
+
+    OrderBook book("BTCUSDT");
+    Aggregator agg;
+
+    book.apply_update(make_update({{100.0, 1.0}}, {{110.0, 1.0}}));
+    agg.update(book);
+
+    detector.evaluate("BTCUSDT", book, agg.snapshot());
+    detector.evaluate("BTCUSDT", book, agg.snapshot());
+    detector.evaluate("BTCUSDT", book, agg.snapshot());
+
+    EXPECT_EQ(fired.size(), 3u);
+}
+
 TEST(SignalDetector, SignalTypeName) {
     EXPECT_STREQ(signal_type_name(SignalType::SPREAD_WIDE), "SPREAD_WIDE");
     EXPECT_STREQ(signal_type_name(SignalType::IMBALANCE_ASK), "IMBALANCE_ASK");

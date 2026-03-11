@@ -87,12 +87,23 @@ void SignalDetector::evaluate(const std::string& symbol,
         }
 
         if (triggered) {
+            auto now_us = core::Clock::wall_us();
+
+            // Cooldown: suppress if same type+symbol fired recently
+            CooldownKey key{cond.type, symbol};
+            auto it = last_fired_.find(key);
+            if (it != last_fired_.end() && (now_us - it->second) < cond.cooldown_us) {
+                ++suppressed_;
+                continue;
+            }
+            last_fired_[key] = now_us;
+
             Signal sig;
             sig.type = cond.type;
             sig.symbol = symbol;
             sig.value = value;
             sig.threshold = cond.threshold;
-            sig.timestamp_us = core::Clock::wall_us();
+            sig.timestamp_us = now_us;
 
             if (callback_) {
                 callback_(sig);

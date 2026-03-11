@@ -12,6 +12,7 @@
 #include <atomic>
 #include <thread>
 #include <mutex>
+#include <deque>
 #include <cstdint>
 #include <unordered_map>
 #include <map>
@@ -36,6 +37,7 @@ struct SymbolSnapshot {
 // Complete engine state snapshot, safe to read from any thread.
 struct EngineSnapshot {
     std::vector<SymbolSnapshot> symbols;
+    std::vector<Signal> recent_signals;  // Most recent signals (newest first)
     uint64_t processed_count = 0;
     uint64_t trades_processed = 0;
     uint64_t signals_fired = 0;
@@ -97,6 +99,9 @@ private:
     EngineSnapshot snapshot_;
     SignalDetector signal_detector_;
     std::vector<SignalCondition> signal_conditions_;
+
+    static constexpr size_t MAX_RECENT_SIGNALS = 50;
+    std::deque<Signal> recent_signals_;  // Guarded by snapshot_mutex_
 
     std::atomic<uint64_t> processed_{0};
     std::atomic<uint64_t> trades_processed_{0};

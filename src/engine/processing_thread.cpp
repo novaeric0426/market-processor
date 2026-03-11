@@ -16,6 +16,14 @@ ProcessingThread::ProcessingThread(feed::FeedQueue& queue,
           signals_fired_.fetch_add(1, std::memory_order_relaxed);
           spdlog::info("SIGNAL [{}] {} value={:.6f} threshold={:.6f}",
               sig.symbol, signal_type_name(sig.type), sig.value, sig.threshold);
+          // Store recent signals for dashboard
+          {
+              std::lock_guard<std::mutex> lock(snapshot_mutex_);
+              recent_signals_.push_front(sig);
+              if (recent_signals_.size() > MAX_RECENT_SIGNALS) {
+                  recent_signals_.pop_back();
+              }
+          }
       })
     , signal_conditions_(std::move(signal_conditions))
 {
@@ -178,6 +186,8 @@ void ProcessingThread::update_snapshot() {
     snapshot_.last_parse_us = last_parse_us_.load(std::memory_order_relaxed);
     snapshot_.last_queue_us = last_queue_us_.load(std::memory_order_relaxed);
     snapshot_.last_total_us = last_total_us_.load(std::memory_order_relaxed);
+
+    snapshot_.recent_signals.assign(recent_signals_.begin(), recent_signals_.end());
 
     snapshot_.symbols.clear();
     snapshot_.symbols.reserve(states_.size());

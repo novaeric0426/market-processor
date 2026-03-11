@@ -1,6 +1,7 @@
 import useEngineSocket from './hooks/useEngineSocket';
 import OrderBookChart from './components/OrderBookChart';
 import MetricsPanel from './components/MetricsPanel';
+import SignalLogPanel from './components/SignalLogPanel';
 import ReplayControls from './components/ReplayControls';
 import './App.css';
 
@@ -41,6 +42,7 @@ function App() {
 
         <div className="right-panel">
           <MetricsPanel data={data} status={status} />
+          <SignalLogPanel data={data} />
           <ReplayControls data={data} sendCommand={sendCommand} />
         </div>
       </main>

@@ -108,6 +108,18 @@ namespace {
             j["recording"]["records"] = recorder->record_count();
         }
 
+        // Recent signals
+        j["recent_signals"] = nlohmann::json::array();
+        for (const auto& sig : snapshot.recent_signals) {
+            j["recent_signals"].push_back({
+                {"type", mde::engine::signal_type_name(sig.type)},
+                {"symbol", sig.symbol},
+                {"value", sig.value},
+                {"threshold", sig.threshold},
+                {"timestamp_us", sig.timestamp_us}
+            });
+        }
+
         // Per-symbol order book + aggregation
         j["symbols"] = nlohmann::json::array();
         for (const auto& sym : snapshot.symbols) {

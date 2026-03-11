@@ -23,7 +23,7 @@ Receives real-time order book data from Binance WebSocket, parses with simdjson,
 
 ## Performance
 
-> Apple M3 Air, Release build (-O2), Google Benchmark
+> Apple M4 Air, Release build (-O2), Google Benchmark
 
 | Component | Latency | Throughput |
 |-----------|---------|------------|

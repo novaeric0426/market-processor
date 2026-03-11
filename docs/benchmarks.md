@@ -1,6 +1,6 @@
 # Benchmark Results
 
-> Environment: Apple M3 Air (10 cores), macOS, AppleClang 17.0, Release build (-O2)
+> Environment: Apple M4 Air (10 cores), macOS, AppleClang 17.0, Release build (-O2)
 >
 > All benchmarks use Google Benchmark framework with sufficient iterations for statistical stability.
 

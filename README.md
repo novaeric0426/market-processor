@@ -77,7 +77,7 @@ cmake --build build/bench
 ./build/release/market-engine config/prod.yaml
 
 # Replay at 5x speed
-./build/release/market-engine --replay recordings/<file>.mde --speed 5x
+./build/release/market-engine --replay recordings/<file>.bin --speed 5x config/dev.yaml
 ```
 
 ## Project Structure

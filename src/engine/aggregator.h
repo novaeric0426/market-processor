@@ -16,6 +16,7 @@ struct AggregatorSnapshot {
     double mid_price_sma = 0.0;   // Simple moving average of mid price
     double spread_sma = 0.0;      // Simple moving average of spread
     double bid_ask_imbalance = 0.0; // (total_bid_qty - total_ask_qty) / (total_bid_qty + total_ask_qty)
+    double imbalance_delta = 0.0;   // Change in imbalance from previous update (book pressure direction)
     uint64_t sample_count = 0;
 };
 

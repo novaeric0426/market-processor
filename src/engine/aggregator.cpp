@@ -14,11 +14,13 @@ void Aggregator::update(const OrderBook& book) {
     snapshot_.bid_vwap = book.bid_vwap(vwap_levels_);
     snapshot_.ask_vwap = book.ask_vwap(vwap_levels_);
 
-    // Bid-ask imbalance
+    // Bid-ask imbalance + pressure (rate of change)
     double total_bid = book.total_bid_qty();
     double total_ask = book.total_ask_qty();
     double total = total_bid + total_ask;
+    double prev_imbalance = snapshot_.bid_ask_imbalance;
     snapshot_.bid_ask_imbalance = (total > 0.0) ? (total_bid - total_ask) / total : 0.0;
+    snapshot_.imbalance_delta = snapshot_.bid_ask_imbalance - prev_imbalance;
 
     // Rolling SMA
     if (snapshot_.mid_price > 0.0) {

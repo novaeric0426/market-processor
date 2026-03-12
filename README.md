@@ -1,7 +1,7 @@
 # Market Data Engine
 
 [한국어](README.ko.md)
-![alt text](<스크린샷 2026-03-12 오후 6.19.57.png>)
+<img width="1694" height="864" alt="스크린샷 2026-03-12 오후 6 19 57" src="https://github.com/user-attachments/assets/8d65aee9-a213-4e90-be65-9adbead69826" />
 Low-latency market data processing pipeline built in C++17.
 
 Receives real-time order book data from Binance WebSocket, parses with simdjson, routes through a lock-free SPSC queue, maintains per-symbol order books, computes aggregations (VWAP, spread SMA, bid-ask imbalance), and fires configurable signals — all within **~3μs end-to-end latency**.

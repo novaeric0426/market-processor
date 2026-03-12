@@ -1,5 +1,5 @@
 # Market Data Engine
-![alt text](<스크린샷 2026-03-12 오후 6.19.57-1.png>)
+<img width="1694" height="864" alt="스크린샷 2026-03-12 오후 6 19 57" src="https://github.com/user-attachments/assets/8fca8446-a4bb-469a-a4f8-bdb9a93bbb1f" />
 C++17로 구현한 저지연 시장 데이터 처리 파이프라인.
 
 바이낸스 WebSocket에서 실시간 오더북 데이터를 수신하고, simdjson으로 파싱하여 lock-free SPSC 큐를 통해 전달합니다. 심볼별 오더북을 유지하면서 집계 지표(VWAP, 스프레드 SMA, 매수/매도 불균형)를 계산하고, 설정 기반 시그널을 감지합니다 — 수신부터 시그널 발화까지 **E2E 레이턴시 ~3μs**.
